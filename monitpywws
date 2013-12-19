@@ -1,0 +1,10 @@
+# This files goes in /etc/monit/conf.d/
+# Edit the locations as necessary
+
+check process pywws with pidfile /run/pywws-livelog.pid
+   start program = "/etc/init.d/pywws-livelog start"
+   stop  program = "/etc/init.d/pywws-livelog stop"
+   if 5 restarts within 5 cycles then timeout
+ 
+check directory uploads path /home/pi/weather/data
+  if timestamp > 10 minutes then exec "/etc/init.d/pywws-livelog restart"
