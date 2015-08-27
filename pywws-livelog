@@ -1,59 +1,61 @@
 #!/bin/sh
 
 ### BEGIN INIT INFO
-# Provides:          pywws
-# Required-Start:    $all
-# Required-Stop:     $all
-# Default-Start:     2 3 4 5
-# Default-Stop:      0 1 6
-# Short-Description: Put a short description of the service here
-# Description:       Put a long description of the service here
+# Provides:        pywws-livelog-daemon
+# Required-Start:  $all
+# Required-Stop:   $all
+# Default-Start:   2 3 4 5
+# Default-Stop:    0 1 6
+# Short-Description: Start pywws daemon
 ### END INIT INFO
 
-# Change the next 3 lines to suit where you install your script and what you want to call it
-DIR=/usr/local/bin
-DAEMON=$DIR/pywws-livelog.py
-DAEMON_NAME=pywws-livelog
-DAEMON_OPTS=' -v -l /home/pi/weather/data/pywws-livelog.log /home/pi/weather/data'
-
-# This next line determines what user the script runs as.
-# Root generally not recommended but necessary if you are using the Raspberry Pi GPIO from Python.
-DAEMON_USER=pi
-
-# The process ID of the script when it runs is stored here:
-PIDFILE=/var/run/$DAEMON_NAME.pid
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
 
 . /lib/lsb/init-functions
 
-do_start () {
-    log_daemon_msg "Starting system $DAEMON_NAME daemon"
-    start-stop-daemon -v --start --background --pidfile $PIDFILE --make-pidfile --chuid $DAEMON_USER --exec $DAEMON -- $DAEMON_OPTS
-    log_end_msg $?
-}
-do_stop () {
-    log_daemon_msg "Stopping system $DAEMON_NAME daemon"
-    start-stop-daemon --stop --pidfile $PIDFILE --retry 10
-    log_end_msg $?
-}
+DAEMON=/usr/local/bin/pywws-livelog-daemon.py
+PIDFILE=/var/run/pywws.pid
+DATADIR=/home/pi/weather/data
+LOGFILE=$DATADIR/live_logger.log
 
-case "$1" in
+RUNASUSER=pi
+UGID=$(getent passwd $RUNASUSER | cut -f 3,4 -d:) || true
 
-    start|stop)
-        do_${1}
-        ;;
-
-    restart|reload|force-reload)
-        do_stop
-        do_start
-        ;;
-
-    status)
-        status_of_proc "$DAEMON_NAME" "$DAEMON" && exit 0 || exit $?
-        ;;
-    *)
-        echo "Usage: /etc/init.d/$DEAMON_NAME {start|stop|restart|status}"
-        exit 1
-        ;;
-
+case $1 in
+	start)
+		log_daemon_msg "Starting pywws service" "pywws"
+		if [ -z "$UGID" ]; then
+			log_failure_msg "user \"$RUNASUSER\" does not exist"
+			exit 1
+		fi
+		$DAEMON -v $DATADIR $LOGFILE start 
+		status=$?
+		log_end_msg $status
+  		;;
+	stop)
+		log_daemon_msg "Stopping pywws service" "pywws"
+		$DAEMON -v $DATADIR $LOGFILE stop
+		log_end_msg $?
+		rm -f $PIDFILE
+  		;;
+	restart|force-reload)
+		$DAEMON -v $DATADIR $LOGFILE restart
+  		;;
+	try-restart)
+		if $0 status >/dev/null; then
+			$0 restart
+		else
+			exit 0
+		fi
+		;;
+	reload)
+		exit 3
+		;;
+	status)
+		status_of_proc $DAEMON "pywws service"
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart|try-restart|force-reload|status}"
+		exit 2
+		;;
 esac
-exit 0
